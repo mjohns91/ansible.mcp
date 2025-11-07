@@ -1,0 +1,6 @@
+---
+# Default variables for run_tool integration tests
+
+# GitHub MCP Server configuration
+github_mcp_manifest_path: "{{ playbook_dir }}/files/github_mcpservers.json"
+github_test_repo: "ansible/ansible"

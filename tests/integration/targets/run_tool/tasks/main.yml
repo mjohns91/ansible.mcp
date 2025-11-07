@@ -1,0 +1,37 @@
+---
+# Main entry point for run_tool integration tests
+# This follows the standard ansible-test integration test pattern
+
+- name: Check if GitHub PAT is available
+  ansible.builtin.set_fact:
+    github_pat: "{{ lookup('env', 'GITHUB_PERSONAL_ACCESS_TOKEN') }}"
+  failed_when: false
+  delegate_to: localhost
+
+- name: Skip message when no PAT
+  ansible.builtin.debug:
+    msg: "Skipping GitHub tests - GITHUB_PERSONAL_ACCESS_TOKEN not set"
+  when: not (github_pat is defined and github_pat | length > 0)
+  delegate_to: localhost
+
+- name: Add github_server host dynamically
+  ansible.builtin.add_host:
+    name: github_server
+    ansible_connection: ansible.mcp.mcp
+    ansible_mcp_server_name: github
+    ansible_mcp_server_args: []
+    ansible_mcp_server_env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "{{ github_pat }}"
+    ansible_mcp_manifest_path: "{{ role_path }}/files/github_mcpservers.json"
+    groups:
+      - mcp_servers
+  delegate_to: localhost
+  when: github_pat is defined and github_pat | length > 0
+
+- name: Run tests against github_server
+  delegate_to: github_server
+  block:
+    - name: Run GitHub MCP tool tests
+      ansible.builtin.include_tasks: test_github.yml
+
+  when: github_pat is defined and github_pat | length > 0
