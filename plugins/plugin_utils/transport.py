@@ -125,19 +125,26 @@ class Stdio(Transport):
         response = {}
         buffer = b""
         if self._process:
-            while True:
-                rfd, wfd, efd = select.select([self._process.stdout], [], [], wait_timeout)
-                if self._process.stdout in rfd:
-                    buffer += os.read(self._process.stdout.fileno(), 4096)
-                    if b"\n" in buffer:
-                        line, buffer = buffer.split(b"\n", 1)
-                        response = json.loads(line.decode("utf-8"))
+            rfd, wfd, efd = select.select([self._process.stdout], [], [], wait_timeout)
+            if not (rfd or wfd or efd):
+                # Process has timeout
+                raise AnsibleConnectionFailure(
+                    f"MCP server response timeout after {wait_timeout} seconds."
+                )
+
+            if self._process.stdout in rfd:
+                # Read until we get a newline (complete JSON-RPC message)
+                # MCP messages are newline-delimited, but may exceed buffer size
+                buffer = []
+                while True:
+                    chunk = os.read(self._process.stdout.fileno(), 4096).decode("utf-8")
+                    if not chunk:
                         break
-                else:
-                    # Process has timeout
-                    raise AnsibleConnectionFailure(
-                        f"MCP server response timeout after {wait_timeout} seconds."
-                    )
+                    buffer.append(chunk)
+                    # MCP messages are newline-delimited - stop when we get one
+                    if "\n" in chunk:
+                        break
+                response = json.loads("".join(buffer).strip())
         return response
 
     def _stdin_write(self, data: dict) -> None:

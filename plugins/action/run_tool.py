@@ -1,102 +1,10 @@
 # -*- coding: utf-8 -*-
+
 # Copyright (c) 2025 Red Hat, Inc.
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-"""Action plugin for calling tools on an MCP server."""
-
 from ansible.module_utils.connection import Connection
 from ansible.plugins.action import ActionBase
-
-
-DOCUMENTATION = r"""
----
-module: run_tool
-short_description: Call a specific tool on an MCP server
-description:
-    - Call a specific tool on an MCP server.
-    - The plugin validates tool calls using the server's tools list.
-    - Fails with an appropriate error message when there is a mismatch.
-    - Uses the MCP connection plugin to communicate with the server.
-version_added: "1.0.0"
-options:
-    name:
-        description:
-            - The name of the tool to call on the MCP server.
-        required: true
-        type: str
-    args:
-        description:
-            - Arguments to pass to the tool.
-            - The required arguments vary depending on the tool being called.
-        type: dict
-        default: {}
-author:
-    - Mandar Vijay Kulkarni (@mandar242)
-notes:
-    - This plugin requires an MCP connection to be established.
-    - Use C(connection: ansible.mcp.mcp) in your playbook.
-    - See the MCP connection plugin documentation for configuration options.
-"""
-
-
-EXAMPLES = r"""
-- name: Get weather information
-  ansible.mcp.run_tool:
-    name: get_weather
-    args:
-      location: Durham
-
-- name: Create a resource with multiple parameters
-  ansible.mcp.run_tool:
-    name: create_resource
-    args:
-      name: my-resource
-      type: compute
-      region: us-east-1
-
-- name: Call a tool without arguments
-  ansible.mcp.run_tool:
-    name: list_available_tools
-
-- name: Handle tool errors gracefully
-  ansible.mcp.run_tool:
-    name: risky_operation
-    args:
-      force: true
-  ignore_errors: true
-  register: result
-"""
-
-
-RETURN = r"""
-content:
-    description:
-        - List of content objects representing the result of the tool call.
-        - Typically contains text responses or structured data.
-    returned: success
-    type: list
-    elements: dict
-    sample:
-        - type: text
-          text: Current weather in Durham is 72°F and partly cloudy.
-is_error:
-    description:
-        - Indicates whether the tool call resulted in an error.
-        - Only included when the MCP server reports an error.
-    type: bool
-    returned: when MCP server reported an error
-    sample: false
-structured_content:
-    description:
-        - Optional structured result of the tool call.
-        - Provides machine-readable output in addition to text content.
-    returned: when provided by the MCP server
-    type: dict
-    sample:
-        temperature: 72
-        conditions: partly cloudy
-        humidity: 65
-"""
 
 
 class ActionModule(ActionBase):
@@ -150,7 +58,11 @@ class ActionModule(ActionBase):
             return None, None, "Missing required parameter: 'name'"
 
         if not isinstance(tool_args, dict):
-            return None, None, f"Parameter 'args' must be a dictionary, got {type(tool_args).__name__}"
+            return (
+                None,
+                None,
+                f"Parameter 'args' must be a dictionary, got {type(tool_args).__name__}",
+            )
 
         return tool_name, tool_args, None
 
@@ -179,9 +91,7 @@ class ActionModule(ActionBase):
 
     def _extract_error_message(self, content, tool_name):
         """Extract error message from response content."""
-        error_messages = [
-            item.get("text", "")
-            for item in content
-            if item.get("type") == "text"
-        ]
-        return " ".join(error_messages) if error_messages else f"Tool '{tool_name}' execution failed"
+        error_messages = [item.get("text", "") for item in content if item.get("type") == "text"]
+        return (
+            " ".join(error_messages) if error_messages else f"Tool '{tool_name}' execution failed"
+        )
