@@ -6,23 +6,18 @@
 from ansible.module_utils.connection import Connection
 from ansible.plugins.action import ActionBase
 
+from ansible_collections.ansible.mcp.plugins.plugin_utils.utils import validate_connection_plugin
+
 
 class ActionModule(ActionBase):
 
     def run(self, tmp=None, task_vars=None):
         """Perform the process of the action plugin"""
-        connection_name = self._play_context.connection.split(".")[-1]
 
         result = super(ActionModule, self).run(task_vars=task_vars)
-
-        if connection_name != "mcp":
-            # It is supported only with mcp connection plugin
-            result["failed"] = True
-            result["msg"] = (
-                "connection type %s is not valid for tools_info module,"
-                " please use fully qualified name of mcp connection type"
-                % self._play_context.connection
-            )
+        v_result = validate_connection_plugin(self._play_context, "tools_info")
+        if v_result:
+            result.update(v_result)
             return result
 
         conn = Connection(self._connection.socket_path)
