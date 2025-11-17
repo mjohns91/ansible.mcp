@@ -1,2 +1,2 @@
 # required for aws mcp server
-uvx
+uv
