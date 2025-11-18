@@ -1,0 +1,5 @@
+---
+- name: Generate inventory file in the expected location
+  ansible.builtin.template:
+    src: inventory.yml.j2
+    dest: "{{ ansible_mcp_inventory_file_path }}"

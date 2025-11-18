@@ -8,17 +8,7 @@
         server_name: github
         bearer_token: "{{ github_mcp_pat }}"
         manifest_path: "{{ playbook_dir }}/manifest.json"
+    ansible_mcp_inventory_file_path: "{{ playbook_dir }}/inventory.yml"
 
-  tasks:
-    - ansible.builtin.import_role:
-        name: generate_inventory
-
-    - name: Copy temporary inventory file into expected location
-      ansible.builtin.copy:
-        src: "{{ generate_inventory_file_path }}"
-        dest: "{{ playbook_dir }}/inventory.yml"
-
-    - name: Delete path to the inventory
-      ansible.builtin.file:
-        state: absent
-        path: "{{ generate_inventory_file_path }}"
+  roles:
+    - role: prepare_inventory
