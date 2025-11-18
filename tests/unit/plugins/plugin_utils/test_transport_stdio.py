@@ -161,7 +161,7 @@ def test_stdout_read_no_data(mock_select, mock_process):
 @pytest.mark.parametrize(
     "stdout_line,data",
     [
-        (b'{"hello": "world"}', dict(hello="world")),
+        (b'{"hello": "world"}\n', dict(hello="world")),
         (b'{"foo": "bar"}\n', dict(foo="bar")),
     ],
 )
