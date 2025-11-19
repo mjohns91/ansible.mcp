@@ -1,1 +1,1 @@
-cloud/aws
+disabled # due to https://github.com/ansible/ansible/pull/86198
