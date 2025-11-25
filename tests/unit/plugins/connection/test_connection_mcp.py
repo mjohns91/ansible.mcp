@@ -179,6 +179,7 @@ class TestMCPConnection:
         mock_stdio.assert_called_once_with(
             cmd=expected_cmd,
             env={"DEBUG": "1"},
+            command_timeout=15,
         )
 
     @patch("ansible_collections.ansible.mcp.plugins.connection.mcp.StreamableHTTP", autospec=True)

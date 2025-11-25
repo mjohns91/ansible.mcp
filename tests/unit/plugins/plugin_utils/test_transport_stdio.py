@@ -149,7 +149,7 @@ def test_stdin_write(mock_process):
 def test_stdout_read_no_data(mock_select, mock_process):
 
     cmd = MagicMock()
-    stdio = Stdio(cmd=cmd)
+    stdio = Stdio(cmd=cmd, command_timeout=5)
     stdio._process = mock_process
     mock_select.return_value = [], [], []
 

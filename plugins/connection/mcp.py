@@ -220,7 +220,8 @@ class Connection(PersistentConnectionBase):
             cmd = [server_info["command"]] + manifest_args + plugin_args
             env = self.get_option("server_env") or {}
             display.vvv(f"[mcp] Starting stdio MCP server '{server_name}': {' '.join(cmd)}")
-            return Stdio(cmd=cmd, env=env)
+            command_timeout = self.get_option("persistent_command_timeout")
+            return Stdio(cmd=cmd, env=env, command_timeout=command_timeout)
 
         elif transport_type == "http":
             url = server_info.get("url")

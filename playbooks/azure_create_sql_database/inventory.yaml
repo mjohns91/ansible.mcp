@@ -1,0 +1,9 @@
+all:
+  children:
+    mcp_servers:
+      hosts:
+        azure:
+          ansible_connection: ansible.mcp.mcp
+          ansible_mcp_server_name: azure
+          ansible_mcp_server_args: []
+          ansible_command_timeout: 3600

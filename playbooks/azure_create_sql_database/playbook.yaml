@@ -1,0 +1,38 @@
+---
+- name: Create SQL database on Azure
+  hosts: all
+  gather_facts: false
+
+  vars:
+    # Connection plugin variables
+    ansible_mcp_manifest_path: "{{ playbook_dir }}/manifest.json"
+
+    db_admin_login: "ansible"
+    db_admin_password: "_AZe=MmV~F0)Z4<B"
+
+  tasks:
+    - name: Create SQL server instance
+      ansible.mcp.run_tool:
+        name: sql
+        args:
+          command: sql_server_create
+          intent: 'create sql server instance'
+          parameters:
+            resource-group: "{{ azure_resource_group }}"
+            subscription: "{{ azure_subscription }}"
+            location: "{{ azure_location | default('eastus')}}"
+            server: "{{ db_server_name }}"
+            administrator-login: "{{ db_admin_login }}"
+            administrator-password: "{{ db_admin_password }}"
+
+    - name: Create SQL database
+      ansible.mcp.run_tool:
+        name: sql
+        args:
+          command: "sql_db_create"
+          intent: "create sql database"
+          parameters:
+            subscription: "{{ azure_subscription }}"
+            resource-group: "{{ azure_resource_group }}"
+            server: "{{ db_server_name }}"
+            database: "{{ db_name }}"
