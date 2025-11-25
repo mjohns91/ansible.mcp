@@ -13,8 +13,10 @@
         server_args:
           - --readonly
         server_env:
-          AWS_REGION: us-east-1
-          AWS_PROFILE: default
+          AWS_REGION: "{{ aws_region }}"
+          AWS_ACCESS_KEY_ID: "{{ aws_access_key }}"
+          AWS_SECRET_ACCESS_KEY: "{{ aws_secret_key }}"
+          AWS_SESSION_TOKEN: "{{ security_token }}"
         manifest_path: "{{ playbook_dir }}/manifest.json"
     ansible_mcp_inventory_file_path: "{{ playbook_dir }}/inventory.yml"
 
