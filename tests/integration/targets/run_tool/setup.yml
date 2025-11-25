@@ -8,9 +8,9 @@
 
   tasks:
     - name: Check if GitHub PAT is available
-      ansible.builtin.set_fact:
-        github_pat: "{{ github_mcp_pat | default(lookup('env', 'GITHUB_PERSONAL_ACCESS_TOKEN'), true) }}"
-      failed_when: false
+      ansible.builtin.fail:
+        msg: 'The Github PAT must be defined using github_mcp_pat variable'
+      when: github_mcp_pat is undefined
 
     - name: Add GitHub MCP host if PAT is available
       ansible.builtin.set_fact:
@@ -20,9 +20,8 @@
           name: github
           server_name: github
           server_args: []
-          bearer_token: "{{ github_pat }}"
+          bearer_token: "{{ github_mcp_pat }}"
           manifest_path: "{{ playbook_dir }}/manifest.json"
-      when: github_pat is defined and github_pat | length > 0
 
     - name: Check if uvx is installed (for AWS tests)
       ansible.builtin.command: which uvx
@@ -39,7 +38,10 @@
           server_name: aws
           server_args: []
           server_env:
-            AWS_REGION: "{{ lookup('env', 'AWS_REGION') | default('us-east-1', true) }}"
+            AWS_REGION: "{{ aws_region }}"
+            AWS_ACCESS_KEY_ID: "{{ aws_access_key }}"
+            AWS_SECRET_ACCESS_KEY: "{{ aws_secret_key }}"
+            AWS_SESSION_TOKEN: "{{ security_token }}"
             FASTMCP_LOG_LEVEL: "ERROR"
           manifest_path: "{{ playbook_dir }}/manifest.json"
       when: uvx_check.rc == 0
