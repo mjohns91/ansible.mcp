@@ -1,0 +1,9 @@
+all:
+  children:
+    mcp_servers:
+      hosts:
+        github:
+          ansible_connection: ansible.mcp.mcp
+          ansible_mcp_server_name: github
+          ansible_mcp_manifest_path: "{{ playbook_dir }}/manifest.json"
+          ansible_mcp_bearer_token: "{{ github_token }}"

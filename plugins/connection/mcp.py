@@ -271,9 +271,9 @@ class Connection(PersistentConnectionBase):
         return self._client.list_tools()
 
     @ensure_connected
-    def call_tool(self, tool: str, **kwargs: Any) -> Dict[str, Any]:
+    def call_tool(self, tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
         """Calls a specific tool on the MCP server."""
-        return self._client.call_tool(tool, **kwargs)
+        return self._client.call_tool(tool, **args)
 
     @ensure_connected
     def validate(self, tool: str, **kwargs: Any) -> None:

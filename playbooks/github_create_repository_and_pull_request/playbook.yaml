@@ -1,0 +1,43 @@
+---
+- name: Demo playbook for using GitHub MCP Server to create a repository and a pull request
+  hosts: github
+  gather_facts: false
+
+  tasks:
+    - name: Create Github repository
+      ansible.mcp.run_tool:
+        name: create_repository
+        args:
+          organization: "{{ github_organization }}"
+          name: "{{ github_repository_name }}"
+          autoInit: true
+
+    - name: Create repository branch
+      ansible.mcp.run_tool:
+        name: create_branch
+        args:
+          branch: "{{ github_branch_name }}"
+          owner: "{{ github_organization }}"
+          repo: "{{ github_repository_name }}"
+
+    - name: Add new file to the branch
+      ansible.mcp.run_tool:
+        name: create_or_update_file
+        args:
+          branch: "{{ github_branch_name }}"
+          content: "{{ file_content }}"
+          message: 'File pushed using ansible.mcp collection'
+          owner: "{{ github_organization }}"
+          repo: "{{ github_repository_name }}"
+          path: "{{ file_path }}"
+
+    - name: Create pull request
+      ansible.mcp.run_tool:
+        name: create_pull_request
+        args:
+          owner: "{{ github_organization }}"
+          repo: "{{ github_repository_name }}"
+          base: main
+          head: "{{ github_branch_name }}"
+          title: "{{ pull_request_title }}"
+          body: "{{ pull_request_body }}"

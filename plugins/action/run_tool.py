@@ -104,7 +104,7 @@ class ActionModule(ActionBase):
             Exception: If the tool execution fails at the connection level.
         """
         conn = Connection(self._connection.socket_path)
-        return conn.call_tool(tool_name, **tool_args)
+        return conn.call_tool(tool_name, args=tool_args)
 
     def _populate_result(
         self, action_result: ActionResult, response: Dict[str, Any], tool_name: str
