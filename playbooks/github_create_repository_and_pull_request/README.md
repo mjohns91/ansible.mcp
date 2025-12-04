@@ -10,7 +10,7 @@ A practical demonstration using the ansible.mcp collection to interact with the 
 To run this playbook, you need the following:
 
   * **The `ansible.mcp` Collection:** This custom collection must be installed locally.
-  * **GitHub Personal Access Token (PAT):** A PAT with the necessary scopes (`repo` scope for repository and PR management).
+  * **GitHub Personal Access Token (PAT):** A PAT with the necessary scopes (`repo` scope for repository and PR management). These scopes are for using classic token only.
 
 
 ## 🚀 Usage
@@ -23,7 +23,7 @@ You will need to define variables for:
 
 | Variable | Description | Example Value |
 | :--- | :--- | :--- |
-| `github_token` | our GitHub Personal Access Token. | ghp_xxxxxxxxxxxxxxxxxxxxxxxxxx |
+| `github_token` | Your GitHub Personal Access Token. | `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxx` |
 | `github_organization` | The Github organization, if not specified the repository will be created in the user space. | ansible-collections |
 | `github_repository_name` | The Github repository name. | `testing` |
 | `github_branch_name` | The branch name to create the pull request against. | `release_2` |
@@ -40,5 +40,5 @@ Execute the playbook from your terminal:
 
 ```bash
 # Example using an extra-var for the token (Recommended)
-ansible-playbook playbook.yaml -i inventory.yaml -e "github_token=<YOUR_PAT_HERE>" -e @vars.yaml
+ansible-playbook playbook.yaml -i inventory.yaml -e @vars.yaml
 ```

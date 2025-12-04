@@ -4,11 +4,25 @@
   gather_facts: false
 
   tasks:
+    - name: Retrieve user personal account
+      when: github_organization is undefined
+      block:
+        - name: Get Github user details
+          ansible.mcp.run_tool:
+            name: get_me
+          register: get_me_result
+
+        - name: Set personal account as github_organization
+          ansible.builtin.set_fact:
+            github_owner: "{{ user_info.login }}"
+          vars:
+            user_info: "{{ get_me_result.content.0.text | from_json }}"
+
     - name: Create Github repository
       ansible.mcp.run_tool:
         name: create_repository
         args:
-          organization: "{{ github_organization }}"
+          organization: "{{ github_organization | default(omit) }}"
           name: "{{ github_repository_name }}"
           autoInit: true
 
@@ -17,7 +31,7 @@
         name: create_branch
         args:
           branch: "{{ github_branch_name }}"
-          owner: "{{ github_organization }}"
+          owner: "{{ github_organization | default(github_owner) }}"
           repo: "{{ github_repository_name }}"
 
     - name: Add new file to the branch
@@ -27,7 +41,7 @@
           branch: "{{ github_branch_name }}"
           content: "{{ file_content }}"
           message: 'File pushed using ansible.mcp collection'
-          owner: "{{ github_organization }}"
+          owner: "{{ github_organization | default(github_owner) }}"
           repo: "{{ github_repository_name }}"
           path: "{{ file_path }}"
 
@@ -35,7 +49,7 @@
       ansible.mcp.run_tool:
         name: create_pull_request
         args:
-          owner: "{{ github_organization }}"
+          owner: "{{ github_organization | default(github_owner) }}"
           repo: "{{ github_repository_name }}"
           base: main
           head: "{{ github_branch_name }}"
