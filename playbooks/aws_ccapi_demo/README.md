@@ -24,7 +24,7 @@ The AWS CCAPI MCP Server provides programmatic access to AWS resources via the C
 - Modular task structure with `tasks/process_resource.yml` to process any resource
 - Conditional skipping of security scanning with `skip_security_check=True` if `SECURITY_SCANNING=disabled`
 
-> ⚠️ Note: The CCAPI MCP server enforces a mandatory workflow and is interactive — some tools may prompt for confirmation during execution. Resources cannot be created without either running the security scan or explicitly allowing skipping with `skip_security_check=True`.
+> **Note**: The CCAPI MCP server enforces a mandatory workflow and is interactive, some tools may prompt for confirmation during execution. Resources cannot be created without either running the security scan or explicitly allowing skipping with `skip_security_check=True`.
 
 ---
 
@@ -201,7 +201,7 @@ ansible-playbook -i playbooks/aws_ccapi_demo/inventory.yaml playbooks/aws_ccapi_
 
 You can customize variables in ``group_vars/all.yml``:
 
-- **VPC settings**: ``vpc_name``, ``vpc_cidr``, ``vpc_dns_support``, ``vpc_dns_hostnames``, ``vpc_tags``
+- **VPC settings**: ``vpc_cidr``, ``vpc_dns_support``, ``vpc_dns_hostnames``, ``vpc_tags``
 - **Subnet**: ``subnet_cidr``, ``subnet_az``, ``subnet_tags``
 - **EC2 settings**: ``ec2_instance_type``, ``ec2_count``, ``ec2_key_pair``, ``ec2_tags``
 - **AMI selection**: ``ami_owner_id``, ``ami_name_pattern``
@@ -224,8 +224,19 @@ ami_name_pattern: "amzn2-ami-hvm-*-x86_64-gp2"
 - Ensure your AWS credentials have sufficient IAM permissions for EC2 and VPC operations.
 - Security scanning is optional but recommended. When disabled, skip_security_check=True is mandatory.
 - All resources are automatically tagged with MCP management tags for auditability:
-    - MANAGED_BY: CCAPI-MCP-SERVER
-    - MCP_SERVER_SOURCE_CODE
-    - MCP_SERVER_VERSION
+    - ``MANAGED_BY: CCAPI-MCP-SERVER``
+    - ``MCP_SERVER_SOURCE_CODE``
+    - ``MCP_SERVER_VERSION``
 - Dynamic AMI selection ensures you always use the latest official Amazon Linux AMI, but you can adjust the ``ami_name_pattern`` for other OS or versions.
 - The playbook handles existing resources gracefully using ``AlreadyExists`` responses.
+
+
+### Security Scanning
+
+The playbook optionally performs automated security validation using Checkov:
+
+- When ``aSECURITY_SCANNING`` is set to ``"enabled"``, all generated infrastructure code is scanned before resource creation. Any security findings are explained to the user, and the resource will only be created if validation passes.
+
+- When ``SECURITY_SCANNING``a is set to ``"disabled"``, the security scan is skipped, and the playbook automatically sets ``skip_security_check=True`` for resource creation. A warning is displayed to inform users that resources will be created without automated security validation.
+
+**Important:** Skipping security scanning does not bypass the MCP server workflow; it only bypasses automated Checkov validation. Ensure other security measures are in place when ``SECURITY_SCANNING`` is disabled, especially in production environments.
