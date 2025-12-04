@@ -20,7 +20,7 @@
           parameters:
             resource-group: "{{ azure_resource_group }}"
             subscription: "{{ azure_subscription }}"
-            location: "{{ azure_location | default('eastus')}}"
+            location: "{{ azure_location | default('eastus') }}"
             server: "{{ db_server_name }}"
             administrator-login: "{{ db_admin_login }}"
             administrator-password: "{{ db_admin_password }}"
