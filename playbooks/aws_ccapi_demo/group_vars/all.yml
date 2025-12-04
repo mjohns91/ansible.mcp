@@ -1,22 +1,32 @@
 # AWS Configuration
-AWS_REGION: "us-east-1"
-AWS_PROFILE: "default"
+region: "{{ lookup('env', 'AWS_REGION') | default('us-west-2', true) }}"
+profile: "{{ lookup('env', 'AWS_PROFILE') | default('aworks', true) }}"
+
+security_scanning: "{{ lookup('env', 'SECURITY_SCANNING') | default('disabled', true) | lower }}"
 
 # VPC Configuration
-vpc_name: "demo-vpc"
 vpc_cidr: "10.1.0.0/16"
 vpc_dns_support: true
 vpc_dns_hostnames: true
 vpc_tags:
-  Name: "{{ vpc_name }}"
+  - Key: Name
+    Value: "demo-vpc"
+
+# Subnet Configuration
+subnet_cidr: "10.1.1.0/24"
+subnet_az: "{{ region }}a"
+subnet_tags:
+  - Key: Name
+    Value: "demo-subnet"
 
 # EC2 Configuration
 ec2_instance_type: "t3.micro"
-ec2_key_pair: "demo-key"              # replace with your key pair
+ec2_key_pair: "demo-key"
 ec2_count: 1
 ec2_tags:
-  Name: "demo-ec2"
+  - Key: Name
+    Value: "demo-ec2"
 
 # AMI Selection
-ami_owner_id: "137112412989"           # Amazon official owner for Amazon Linux
+ami_owner_id: "137112412989"  # Amazon official owner for Amazon Linux
 ami_name_pattern: "amzn2-ami-hvm-*-x86_64-gp2"

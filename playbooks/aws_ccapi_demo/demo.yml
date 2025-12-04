@@ -1,132 +1,126 @@
 ---
-- name: AWS CCAPI MCP Server Demo - Create VPC and EC2
+- name: AWS CCAPI MCP Server Demo - Create VPC, KeyPair, and EC2
   hosts: aws_ccapi_server
   gather_facts: false
   vars_files:
     - "../../group_vars/all.yml"
 
+  vars:
+    resources:
+      - name: keypair
+        type: "AWS::EC2::KeyPair"
+        properties:
+          KeyName: "{{ ec2_key_pair }}"
+
+      - name: vpc
+        type: "AWS::EC2::VPC"
+        properties:
+          CidrBlock: "{{ vpc_cidr }}"
+          EnableDnsSupport: "{{ vpc_dns_support }}"
+          EnableDnsHostnames: "{{ vpc_dns_hostnames }}"
+          Tags: "{{ vpc_tags }}"
+      
+      - name: subnet
+        type: "AWS::EC2::Subnet"
+        properties: {}  # we will fill dynamically after VPC creation
+
+      - name: ec2
+        type: "AWS::EC2::Instance"
+        properties_template: {} # we will fill dynamically after subnet creation
+        count: "{{ ec2_count }}"
   tasks:
     - name: Get server information
       ansible.mcp.server_info:
       register: server_info
 
     - name: Display server details
-      ansible.builtin.debug:
+      debug:
         msg: "Connected to {{ server_info.server_info.serverInfo.name }} version {{ server_info.server_info.serverInfo.version }}"
 
-    - name: List available tools
-      ansible.mcp.tools_info:
-      register: tools_list
-    
     - name: Check environment variables
       ansible.mcp.run_tool:
         server_name: "{{ ansible_mcp_server_name }}"
-        name: "check_environment_variables"
+        name: check_environment_variables
       register: env_check
-    
-    - name: Parse environment_token
+
+    - name: Set environment_token
       set_fact:
         environment_token: "{{ env_check.content[0].text | from_json | json_query('environment_token') }}"
 
-    - name: Get AWS session info
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: "get_aws_session_info"
-        args:
-          environment_token: "{{ environment_token }}"
-      register: aws_session
-  
-    - name: Parse credentials_token
+    - name: Find latest Amazon Linux 2 AMI ID
+      amazon.aws.ec2_ami_info:
+        region: "{{ region }}"
+        profile: "{{ profile }}"
+        owners:
+          - "{{ ami_owner_id }}"
+        filters:
+          name: "{{ ami_name_pattern }}"
+          state: available
+      register: ami_info
+
+    - name: Set AMI ID fact
       set_fact:
-        credentials_token: "{{ aws_session.content[0].text | from_json | json_query('credentials_token') }}"
+        ec2_ami_id: >-
+          {{
+            (ami_info.images
+              | default([])
+              | sort(attribute='creation_date', reverse=true)
+              | map(attribute='image_id')
+              | first
+            ).strip()
+          }}
 
-    - name: Generate infrastructure code for the VPC
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: generate_infrastructure_code
-        args:
-          resource_type: "AWS::EC2::VPC"
-          credentials_token: "{{ credentials_token }}"
-          properties:
-            name: "{{ vpc_name }}"
-            cidrBlock: "{{ vpc_cidr }}"
-            region: "{{ AWS_REGION }}"
-            dnsSupport: "{{ vpc_dns_support }}"
-            dnsHostnames: "{{ vpc_dns_hostnames }}"
-            tags: "{{ vpc_tags }}"
-      register: vpc_generated
-
-    - name: Parse generated_code_token
+    - name: Initialize resource_results
       set_fact:
-        generated_code_token: "{{ vpc_generated.content[0].text | from_json | json_query('generated_code_token') }}"
+        resource_results: {}
 
-    - name: Explain VPC creation
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: explain
-        args:
-          content: "{{ vpc_generated.content }}"
-          generated_code_token: "{{ generated_code_token }}"
-      register: vpc_explained
+    # Step 1: Create VPC
+    - name: Process VPC
+      include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: "{{ resources | selectattr('name', 'equalto', 'vpc') | first }}"
 
-    - name: Parse explained_token
-      set_fact:
-        explained_token: "{{ vpc_explained.content[0].text | from_json | json_query('explained_token') }}"
+    # Step 2: Create KeyPair
+    - name: Process KeyPair
+      include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: "{{ resources | selectattr('name', 'equalto', 'keypair') | first }}"
 
-    - name: Run security scan on VPC
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: run_checkov
-        args:
-          explained_token: "{{ explained_token }}"
-      register: vpc_scan
-    
-    - name: Parse scan_token
-      set_fact:
-        scan_token: "{{ vpc_scan.content[0].text | from_json | json_query('scan_token') }}"
+    # Step 3: Create Subnet
+    - name: Process Subnet
+      include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: >-
+          {{
+            resources | selectattr('name', 'equalto', 'subnet') | first
+            | combine({
+                'properties': {
+                  'VpcId': resource_results['vpc'].content[0].text | from_json | json_query('identifier'),
+                  'CidrBlock': "10.1.1.0/24",
+                  'AvailabilityZone': region ~ "a",
+                  'Tags': [{'Key': 'Name', 'Value': 'demo-subnet'}]
+                }
+              })
+          }}
 
-    - name: Approve security findings
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: approve_security_findings
-        args:
-          decision: "proceed"  # or "fix" / "cancel"
-          scan_token: "{{ scan_token }}"
-      register: vpc_security_approval
-
-    - name: Create a new VPC
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: create_resource
-        args:
-          resource_type: "AWS::EC2::VPC"
-          properties:
-            CidrBlock: "{{ vpc_cidr }}"
-            EnableDnsSupport: "{{ vpc_dns_support }}"
-            EnableDnsHostnames: "{{ vpc_dns_hostnames }}"
-            Tags: "{{ vpc_tags }}"
-          credentials_token: "{{ credentials_token }}"
-          explained_token: "{{explained_token }}"
-      register: vpc_result
-
-    - name: Display VPC creation result
-      ansible.builtin.debug:
-        var: vpc_result
-
-    - name: Create an EC2 instance in the new VPC
-      ansible.mcp.run_tool:
-        server_name: "{{ ansible_mcp_server_name }}"
-        name: "aws_ec2_instance"
-        arguments:
-          action: "create"
-          instanceType: "{{ ec2_instance_type }}"
-          amiId: "{{ ec2_ami_id }}"
-          subnetId: "{{ vpc_result.result.subnetIds[0] }}"
-          keyName: "{{ ec2_key_pair }}"
-          count: "{{ ec2_count }}"
-          tags: "{{ ec2_tags }}"
-      register: ec2_result
-
-    - name: Display EC2 creation result
-      ansible.builtin.debug:
-        var: ec2_result
+    # Step 4: Create EC2
+    - name: Process EC2
+      include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: >-
+          {{
+            resources | selectattr('name', 'equalto', 'ec2') | first
+            | combine({
+                'properties_template': {
+                  'InstanceType': ec2_instance_type,
+                  'ImageId': ec2_ami_id,
+                  'SubnetId': resource_results['subnet'].content[0].text | from_json | json_query('identifier'),
+                  'KeyName': resource_results['keypair'].content[0].text | from_json | json_query('identifier'),
+                  'Tags': ec2_tags
+                }
+              })
+          }}
+      when: >
+        resource_results['vpc'] is defined and
+        resource_results['keypair'] is defined and
+        ec2_ami_id is defined

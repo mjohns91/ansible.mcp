@@ -8,3 +8,8 @@ all:
           ansible_mcp_server_args: []
           ansible_command_timeout: 3600
           ansible_mcp_manifest_path: "{{ playbook_dir }}/manifest.json"
+          ansible_mcp_server_env:
+            AWS_REGION: "{{ region }}"
+            AWS_PROFILE: "{{ profile }}"
+            FASTMCP_LOG_LEVEL: ERROR
+            SECURITY_SCANNING: "{{ security_scanning }}"
