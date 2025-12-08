@@ -38,13 +38,6 @@ def mock_response():
     return response
 
 
-@pytest.fixture
-def mock_ansible_openurl_response():
-    response = Mock()
-    response.headers = {}
-    return response
-
-
 @pytest.mark.parametrize(
     "url,headers,expected_headers",
     [
