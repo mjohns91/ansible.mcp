@@ -275,7 +275,7 @@ class StreamableHTTP(Transport):
         """Parse the MCP server response received as raw json or event stream.
 
         Args:
-            response: object returned when calling urllib.request.urlopen.
+            response: object returned by the ansible open_url API.
 
         Returns:
             The JSON-RPC response from the server.
@@ -286,7 +286,7 @@ class StreamableHTTP(Transport):
         if content_type == "text/event-stream":
             for line in raw_response.split("\n"):
                 if line.startswith("data:"):
-                    raw_response = line.split(" ", maxsplit=1)[1]
+                    raw_response = line.split(":", maxsplit=1)[1].lstrip()
                     break
 
         try:

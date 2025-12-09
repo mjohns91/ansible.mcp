@@ -339,7 +339,7 @@ def test_session_id_updates_on_new_session(mock_open_url, streamable_http):
             {"jsonrpc": "2.0", "id": 1, "result": {}},
         ),
         (
-            {"Content-Type": "text/event-stream"},
+            {"Content-Type": "application/json"},
             'data: {"jsonrpc":"2.0","id":1,"result": {}}',
             None,
         ),
@@ -350,10 +350,10 @@ def test_extract_response(headers, response, expected):
     client = StreamableHTTP("http://dummy")
     m_response = Mock()
     m_response.headers = headers
-    m_response.data.return_value = response.encode()
+    m_response.read.return_value = response.encode()
 
     if not expected:
-        with pytest.raises(json.JSONDecodeError) as exc_info:
+        with pytest.raises(Exception) as exc_info:
             client._extract_response(m_response)
         assert str(exc_info.value).startswith("Invalid JSON response:")
     else:
