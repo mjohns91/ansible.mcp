@@ -62,16 +62,20 @@ class Transport(ABC):
 
 
 class Stdio(Transport):
-    def __init__(self, cmd: Union[list[str], str], env: Optional[dict] = None):
+    def __init__(
+        self, cmd: Union[list[str], str], env: Optional[dict] = None, command_timeout: int = 5
+    ):
         """Initialize the stdio transport class.
 
         Args:
             cmd: Command used to run the MCP server.
             env: Environment variables to set for the MCP server process.
+            command_timeout: Wait timeout for command to execute.
         """
         self._cmd = cmd
         self._env = env
         self._process: Optional[Any] = None
+        self._command_timeout = command_timeout
 
     def connect(self) -> None:
         """Spawn a local MCP server subprocess."""
@@ -113,11 +117,9 @@ class Stdio(Transport):
         except Exception as e:
             raise AnsibleConnectionFailure(f"Failed to start MCP server: {str(e)}")
 
-    def _stdout_read(self, wait_timeout: int = 5) -> dict:
+    def _stdout_read(self) -> dict:
         """Read response from MCP server with timeout.
 
-        Args:
-            wait_timeout: The wait timeout value, default: 5.
         Returns:
             A JSON-RPC response dictionary from the MCP server.
         """
@@ -126,17 +128,20 @@ class Stdio(Transport):
         buffer = b""
         if self._process:
             while True:
-                rfd, wfd, efd = select.select([self._process.stdout], [], [], wait_timeout)
+                rfd, wfd, efd = select.select([self._process.stdout], [], [], self._command_timeout)
                 if self._process.stdout in rfd:
                     buffer += os.read(self._process.stdout.fileno(), 4096)
                     if b"\n" in buffer:
                         line, buffer = buffer.split(b"\n", 1)
-                        response = json.loads(line.decode("utf-8"))
-                        break
+                        try:
+                            response = json.loads(line.decode("utf-8"))
+                            break
+                        except Exception:
+                            buffer = b""
                 else:
                     # Process has timeout
                     raise AnsibleConnectionFailure(
-                        f"MCP server response timeout after {wait_timeout} seconds."
+                        f"MCP server response timeout after {self._command_timeout} seconds."
                     )
         return response
 
