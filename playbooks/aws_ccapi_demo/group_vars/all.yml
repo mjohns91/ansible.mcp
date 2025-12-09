@@ -1,6 +1,6 @@
 # AWS Configuration
 region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1', true) }}"
-profile: "{{ lookup('env', 'AWS_PROFILE') | default('deafault', true) }}"
+profile: "{{ lookup('env', 'AWS_PROFILE') | default('default', true) }}"
 
 security_scanning: "{{ lookup('env', 'SECURITY_SCANNING') | default('enabled', true) | lower }}"
 
@@ -28,4 +28,4 @@ ec2_tags:
     Value: "demo-ec2"
 
 # AMI Configuration
-ec2_ami_id: "ami-0156001f0548e90b1"
+ec2_ami_id: "ami-0156001f0548e90b1"  # Update with the appropriate value
