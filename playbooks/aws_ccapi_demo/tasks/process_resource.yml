@@ -1,0 +1,127 @@
+---
+- name: Manage resource creation
+  block:
+    # Step 1: Get fresh credentials for this resource
+    # MCP server's credential tokens are single-scope tokens
+    - name: Get AWS session info for {{ resource_item.name }}
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: get_aws_session_info
+        args:
+          environment_token: "{{ environment_token }}"
+      register: aws_session_token
+
+    - name: Set credentials_token for {{ resource_item.name }}
+      ansible.builtin.set_fact:
+        credentials_token: "{{ (aws_session_token.content[0].text | from_json).credentials_token }}"
+
+    # Step 2: Generate infrastructure code
+    - name: Generate infrastructure code for {{ resource_item.name }}
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: generate_infrastructure_code
+        args:
+          resource_type: "{{ resource_item.type }}"
+          credentials_token: "{{ credentials_token }}"
+          properties: "{{ resource_item.properties if resource_item.name != 'ec2' else resource_item.properties_template }}"
+      register: tmp_generated
+
+    - name: Set generated_code_token for {{ resource_item.name }}
+      ansible.builtin.set_fact:
+        generated_code_token: "{{ (tmp_generated.content[0].text | from_json).generated_code_token }}"
+
+    # Step 3: Explain
+    - name: Explain creation for {{ resource_item.name }}
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: explain
+        args:
+          content: "{{ tmp_generated.content }}"
+          generated_code_token: "{{ generated_code_token }}"
+      register: tmp_explained
+
+    - name: Set explained_token for {{ resource_item.name }}
+      ansible.builtin.set_fact:
+        explained_token: "{{ (tmp_explained.content[0].text | from_json).explained_token }}"
+
+    # Step 4: Security Scan
+    - name: Explain security findings when security_scanning is enabled
+      when: security_scanning == "enabled"
+      block:
+        - name: Run security scan on {{ resource_item.name }}
+          ansible.mcp.run_tool:
+            server_name: "{{ ansible_mcp_server_name }}"
+            name: run_checkov
+            args:
+              explained_token: "{{ explained_token }}"
+          register: tmp_scan
+
+        - name: Set security_scan_token for {{ resource_item.name }}
+          ansible.builtin.set_fact:
+            security_scan_token: >-
+              {{ (tmp_scan.content[0].text | from_json).get('security_scan_token', '')}}
+
+        - name: Explain security findings for {{ resource_item.name }}
+          ansible.mcp.run_tool:
+            server_name: "{{ ansible_mcp_server_name }}"
+            name: explain
+            args:
+              content: "{{ tmp_scan.content }}"
+              context: "Checkov security findings for {{ resource_item.name | upper }}"
+          register: tmp_scan_explained
+
+        - name: Display security findings explanation for {{ resource_item.name }}
+          ansible.builtin.debug:
+            msg: "{{ (tmp_scan_explained.content[0].text | from_json).explanation }}"
+
+        - name: DEBUG - Check security_scanning value after standardization
+          ansible.builtin.debug:
+            msg: "The standardized value of 'security_scanning' is: '{{ security_scanning }}'"
+
+    # Step 5: Create resource
+    - name: Create {{ resource_item.name }}
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: create_resource
+        args:
+          resource_type: "{{ resource_item.type }}"
+          credentials_token: "{{ credentials_token }}"
+          explained_token: "{{ explained_token }}"
+          security_scan_token: "{{ security_scan_token | default('') }}"
+          # Must explicitly allow skipping if scanning is disabled
+          skip_security_check: "{{ True if security_scanning == 'disabled' else omit }}"
+      register: tmp_result
+
+    # Step 6: Wait for resource creation to complete
+    - name: Wait for creation of {{ resource_item.name }}
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: get_resource_request_status
+        args:
+          request_token: "{{ request_token.request_token }}"
+          region: "{{ region }}"
+      register: tmp_status
+      until: >
+        tmp_status.content is defined and
+        tmp_status.content | length > 0 and
+        ((tmp_status.content[0].text | from_json).is_complete == true)
+      retries: 40
+      delay: 5
+      vars:
+        request_token: "{{ tmp_result.content[0].text | from_json}}"
+
+    - name: Fail if creation failed
+      ansible.builtin.fail:
+        msg: "{{ resource_item.name }} creation failed. Status: {{ tmp_status.content[0].text | from_json }}"
+      when: >
+        (tmp_status.content[0].text | from_json).status != "SUCCESS" and
+        (tmp_status.content[0].text | from_json).error_code != "AlreadyExists"
+
+    - name: Save result
+      ansible.builtin.set_fact:
+        resource_results: "{{ resource_results | combine({resource_item.name: tmp_status}) }}"
+
+  rescue:
+    - name: Handle resource processing failure for {{ resource_item.name }}
+      ansible.builtin.fail:
+        msg: "Resource {{ resource_item.name }} failed. Check MCP server logs."

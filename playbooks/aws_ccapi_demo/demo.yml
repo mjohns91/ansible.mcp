@@ -1,0 +1,111 @@
+---
+- name: AWS CCAPI MCP Server Demo - Create VPC, KeyPair, and EC2
+  hosts: aws_ccapi_server
+  gather_facts: false
+  vars_files:
+    - "../../group_vars/all.yml"
+
+  vars:
+    keypair_resource:
+      name: keypair
+      type: "AWS::EC2::KeyPair"
+      properties:
+        KeyName: "{{ ec2_key_pair }}"
+
+    vpc_resource:
+      name: vpc
+      type: "AWS::EC2::VPC"
+      properties:
+        CidrBlock: "{{ vpc_cidr }}"
+        EnableDnsSupport: "{{ vpc_dns_support }}"
+        EnableDnsHostnames: "{{ vpc_dns_hostnames }}"
+        Tags: "{{ vpc_tags }}"
+
+    subnet_resource:
+      name: subnet
+      type: "AWS::EC2::Subnet"
+      properties: {}  # we will fill dynamically after VPC creation
+
+    ec2_resource:
+      name: ec2
+      type: "AWS::EC2::Instance"
+      properties_template: {} # we will fill dynamically after subnet creation
+      count: "{{ ec2_count }}"
+
+  tasks:
+    - name: Get server information
+      ansible.mcp.server_info:
+      register: server_info
+
+    - name: Display server details
+      ansible.builtin.debug:
+        msg: "Connected to {{ server_info.server_info.serverInfo.name }} version {{ server_info.server_info.serverInfo.version }}"
+
+    - name: Check environment variables
+      ansible.mcp.run_tool:
+        server_name: "{{ ansible_mcp_server_name }}"
+        name: check_environment_variables
+      register: env_check
+
+    - name: Set environment_token
+      ansible.builtin.set_fact:
+        environment_token: "{{ (env_check.content[0].text | from_json).environment_token }}"
+
+    - name: Initialize resource_results
+      ansible.builtin.set_fact:
+        resource_results: {}
+
+    # Step 1: Create VPC
+    - name: Process VPC
+      ansible.builtin.include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: "{{ vpc_resource }}"
+
+    # Step 2: Create KeyPair
+    - name: Process KeyPair
+      ansible.builtin.include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: "{{ keypair_resource }}"
+
+    # Step 3: Create Subnet
+    - name: Process Subnet
+      ansible.builtin.include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: >-
+          {{
+            subnet_resource | combine({
+                'properties': {
+                  'VpcId': (resource_results['vpc'].content[0].text | from_json).identifier,
+                  'CidrBlock': "10.1.1.0/24",
+                  'AvailabilityZone': region ~ "a",
+                  'Tags': [{'Key': 'Name', 'Value': 'demo-subnet'}]
+                }
+              })
+          }}
+
+    # Step 4: Create EC2
+    - name: Process EC2
+      ansible.builtin.include_tasks: ./tasks/process_resource.yml
+      vars:
+        resource_item: >-
+          {{
+            ec2_resource | combine({
+                'properties_template': {
+                  'InstanceType': ec2_instance_type,
+                  'ImageId': ec2_ami_id,
+                  'SubnetId': (resource_results['subnet'].content[0].text | from_json).identifier,
+                  'KeyName': (resource_results['keypair'].content[0].text | from_json).identifier,
+                  'Tags': ec2_tags
+                }
+              })
+          }}
+      when: >
+        resource_results['vpc'] is defined and
+        resource_results['keypair'] is defined and
+        resource_results['subnet'] is defined and
+        ec2_ami_id is defined
+
+    # Step 5: Output created resources
+    - name: Display summary of created resources
+      ansible.builtin.debug:
+        var: resource_results
