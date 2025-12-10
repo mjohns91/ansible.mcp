@@ -1,0 +1,14 @@
+all:
+  children:
+    mcp_servers:
+      hosts:
+        aws_core_server:
+          ansible_connection: ansible.mcp.mcp
+          ansible_mcp_server_name: awslabs.core-mcp-server
+          ansible_mcp_server_args: []
+          ansible_mcp_server_env:
+            AWS_REGION: us-east-1
+            AWS_PROFILE: default
+            FASTMCP_LOG_LEVEL: ERROR
+            AWS_FOUNDATION: "true"
+          ansible_mcp_manifest_path: "{{ playbook_dir }}/manifest.json"
